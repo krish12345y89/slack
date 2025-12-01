@@ -23,7 +23,6 @@ class App {
 
     this.initializeMiddlewares();
     this.initializeRoutes();
-    this.initializeSocket();
   }
 
   private initializeMiddlewares(): void {
@@ -67,6 +66,9 @@ class App {
       const database = Database.getInstance();
       await database.connect();
 
+      // Initialize socket only when starting the long-running server (local or container).
+      this.initializeSocket();
+
       this.httpServer.listen(this.port, () => {
         console.log(`🚀 Server running on port ${this.port}`);
       });
@@ -77,7 +79,15 @@ class App {
   }
 }
 
-const app = new App();
-app.start();
+// Create app instance but do NOT start the HTTP server automatically in production
+// (serverless platforms like Vercel expect the module to export the Express app).
+const appInstance = new App();
 
-export default app;
+// Start the server when running locally (non-production). Vercel sets NODE_ENV=production
+// and will import the exported Express app instead of running a persistent server.
+if (process.env.NODE_ENV !== 'production') {
+  appInstance.start();
+}
+
+// Export the underlying Express application for serverless adapters (Vercel, etc.).
+export default appInstance.app;
