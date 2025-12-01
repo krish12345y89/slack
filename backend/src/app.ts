@@ -26,81 +26,50 @@ class App {
   }
 
   private initializeMiddlewares(): void {
-    // Parse allowed origins from environment variables
-    const clientUrls = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'https://slack-iexh.vercel.app')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // SIMPLIFIED CORS - Allow all Vercel preview deployments
+    const allowedOrigins = [
+      // Your main frontend URLs
+      'https://slack-iexh.vercel.app',
+      'https://slack-uavy.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      // Vercel preview pattern (wildcard for your project)
+      /https:\/\/slack-iexh-.*-krishs-projects-2077802b\.vercel\.app$/,
+      /https:\/\/slack-uavy-.*-krishs-projects-.*\.vercel\.app$/,
+    ];
 
-    // ADD your frontend URL since it's different from backend
-    if (!clientUrls.includes('https://slack-iexh.vercel.app')) {
-      clientUrls.push('https://slack-iexh.vercel.app');
-    }
-
-    console.log('🔒 Allowed CORS origins:', clientUrls);
-
-    // CORS configuration
     const corsOptions = {
-      origin: function (origin: any, callback: any) {
-        // Allow requests with no origin (like curl, server-to-server)
+      origin: (origin: any, callback: any) => {
+        // Allow requests with no origin (like server-to-server, curl)
         if (!origin) {
           return callback(null, true);
         }
 
-        // Check if the origin is in the allowed list
-        const isAllowed = clientUrls.some(allowedOrigin => {
-          // Remove protocol and ports for comparison
-          const normalize = (url: string) => {
-            return url.replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
-          };
-
-          const normalizedOrigin = normalize(origin);
-          const normalizedAllowed = normalize(allowedOrigin);
-
-          // Check exact match or subdomain match
-          return normalizedOrigin === normalizedAllowed || 
-                 normalizedOrigin.endsWith('.' + normalizedAllowed);
-        });
-
-        if (isAllowed) {
-          callback(null, true);
-        } else {
-          console.warn(`🚫 CORS blocked: ${origin}. Allowed: ${clientUrls.join(', ')}`);
-          callback(new Error('Not allowed by CORS'));
+        // Check against allowed origins
+        for (const allowedOrigin of allowedOrigins) {
+          if (typeof allowedOrigin === 'string') {
+            if (origin === allowedOrigin || origin.startsWith(allowedOrigin.replace(/\/$/, ''))) {
+              return callback(null, true);
+            }
+          } else if (allowedOrigin instanceof RegExp) {
+            if (allowedOrigin.test(origin)) {
+              return callback(null, true);
+            }
+          }
         }
+
+        console.warn(`🚫 CORS blocked: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cookies'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cookie'],
       exposedHeaders: ['Set-Cookie'],
-      preflightContinue: false,
-      optionsSuccessStatus: 204
+      optionsSuccessStatus: 200
     };
 
-    // Apply CORS middleware to ALL routes
+    // CRITICAL: Apply CORS BEFORE any routes
     this.app.use(cors(corsOptions));
-
-    // Handle preflight requests explicitly
-    this.app.options('*', cors(corsOptions));
-
-    // Manual CORS headers as fallback (important for preflight)
-    this.app.use((req, res, next) => {
-      const origin = req.headers.origin;
-      
-      if (origin && clientUrls.some(allowed => origin.includes(allowed.replace(/https?:\/\//, '')))) {
-        res.header('Access-Control-Allow-Origin', origin);
-        res.header('Access-Control-Allow-Credentials', 'true');
-        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-        
-        // Handle preflight requests
-        if (req.method === 'OPTIONS') {
-          return res.status(204).end();
-        }
-      }
-      
-      next();
-    });
 
     // Body parsers
     this.app.use(express.json());
@@ -108,27 +77,28 @@ class App {
   }
 
   private initializeRoutes(): void {
-    // Health check with CORS test
+    // Test endpoint for CORS
+    this.app.get('/cors-test', (req, res) => {
+      res.json({
+        message: 'CORS test successful!',
+        origin: req.headers.origin || 'none',
+        headers: req.headers,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Health check
     this.app.get('/health', (req, res) => {
       res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
         cors: 'enabled',
-        allowedOrigins: process.env.CLIENT_URLS || process.env.CLIENT_URL,
-        currentOrigin: req.headers.origin || 'none'
+        origin: req.headers.origin || 'none',
+        note: 'If origin is none, this was a direct request'
       });
     });
 
-    // Add a test endpoint for CORS debugging
-    this.app.get('/api/cors-test', (req, res) => {
-      res.json({
-        message: 'CORS is working!',
-        origin: req.headers.origin,
-        method: req.method
-      });
-    });
-
-    // Your API routes
+    // API routes
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/channels', channelRoutes);
     this.app.use('/api/messages', messageRoutes);
@@ -139,32 +109,25 @@ class App {
       this.app.use('/api/debug', debugRoutes);
     }
 
-    // Error handling middleware
+    // Error handling
     this.app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      console.error('🔥 Server Error:', err.stack);
+      console.error('Server Error:', err);
       
-      // CORS error handling
-      if (err.message.includes('CORS') || err.message.includes('Not allowed')) {
+      if (err.message.includes('CORS')) {
         return res.status(403).json({
           error: 'CORS Error',
           message: err.message,
-          allowedOrigins: process.env.CLIENT_URLS || process.env.CLIENT_URL,
-          requestedOrigin: req.headers.origin || 'unknown'
+          yourOrigin: req.headers.origin,
+          tip: 'Make sure your frontend URL matches the allowed patterns'
         });
       }
       
-      res.status(500).json({ 
-        error: 'Internal Server Error',
-        message: 'Something went wrong!' 
-      });
+      res.status(500).json({ error: 'Internal Server Error' });
     });
 
     // 404 handler
     this.app.use('*', (req, res) => {
-      res.status(404).json({ 
-        error: 'Not Found',
-        message: `Route ${req.originalUrl} not found` 
-      });
+      res.status(404).json({ error: 'Not Found', path: req.originalUrl });
     });
   }
 
@@ -182,11 +145,11 @@ class App {
 
       this.httpServer.listen(this.port, () => {
         console.log(`🚀 Server running on port ${this.port}`);
-        console.log(`🌐 CORS enabled for origins:`);
-        const origins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'https://slack-iexh.vercel.app')
-          .split(',')
-          .map((s) => s.trim());
-        origins.forEach(origin => console.log(`   - ${origin}`));
+        console.log(`🌐 CORS enabled for:`);
+        console.log(`   - https://slack-iexh.vercel.app`);
+        console.log(`   - https://slack-uavy.vercel.app`);
+        console.log(`   - All Vercel preview deployments`);
+        console.log(`   - Localhost:5173 and :3000`);
       });
     } catch (error) {
       console.error('Failed to start server:', error);
