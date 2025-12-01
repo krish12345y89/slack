@@ -26,63 +26,148 @@ class App {
   }
 
   private initializeMiddlewares(): void {
-    // SIMPLIFIED CORS - Allow all Vercel preview deployments
+    // VERCEL-SPECIFIC CORS FIX
+    // For Vercel serverless functions, we need to handle CORS differently
+    
+    // Allow ALL Vercel preview domains (adjust as needed)
     const allowedOrigins = [
-      // Your main frontend URLs
       'https://slack-iexh.vercel.app',
+      'https://slack-iexh-49dkpmx6c-krishs-projects-2077802b.vercel.app',
       'https://slack-uavy.vercel.app',
+      'https://slack-ebon.vercel.app',
       'http://localhost:5173',
       'http://localhost:3000',
-      // Vercel preview pattern (wildcard for your project)
-      /https:\/\/slack-iexh-.*-krishs-projects-2077802b\.vercel\.app$/,
-      /https:\/\/slack-uavy-.*-krishs-projects-.*\.vercel\.app$/,
+      // Wildcard pattern for all preview deployments
+      /^https:\/\/(slack-iexh|slack-uavy|slack-ebon).*\.vercel\.app$/,
+      /^https:\/\/slack-.*-krishs-projects-.*\.vercel\.app$/,
     ];
 
-    const corsOptions = {
-      origin: (origin: any, callback: any) => {
-        // Allow requests with no origin (like server-to-server, curl)
-        if (!origin) {
-          return callback(null, true);
+    // Vercel-specific CORS middleware
+    this.app.use((req, res, next) => {
+      const origin = req.headers.origin;
+      
+      // Always allow OPTIONS requests (preflight)
+      if (req.method === 'OPTIONS') {
+        // Check if origin is allowed
+        let isAllowed = false;
+        if (origin) {
+          for (const allowed of allowedOrigins) {
+            if (typeof allowed === 'string') {
+              if (origin === allowed || origin.startsWith(allowed.replace(/\/$/, ''))) {
+                isAllowed = true;
+                break;
+              }
+            } else if (allowed instanceof RegExp) {
+              if (allowed.test(origin)) {
+                isAllowed = true;
+                break;
+              }
+            }
+          }
         }
+        
+        // For Vercel, always set CORS headers for OPTIONS
+        if (origin && isAllowed) {
+          res.header('Access-Control-Allow-Origin', origin);
+        } else if (origin) {
+          // Allow the requesting origin for preflight
+          res.header('Access-Control-Allow-Origin', origin);
+        }
+        
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cookie, Cookies');
+        res.header('Access-Control-Max-Age', '86400'); // 24 hours
+        return res.status(204).end();
+      }
+      
+      // For non-OPTIONS requests, check CORS
+      if (origin) {
+        let isAllowed = false;
+        for (const allowed of allowedOrigins) {
+          if (typeof allowed === 'string') {
+            if (origin === allowed || origin.startsWith(allowed.replace(/\/$/, ''))) {
+              isAllowed = true;
+              break;
+            }
+          } else if (allowed instanceof RegExp) {
+            if (allowed.test(origin)) {
+              isAllowed = true;
+              break;
+            }
+          }
+        }
+        
+        if (isAllowed) {
+          res.header('Access-Control-Allow-Origin', origin);
+        }
+      }
+      
+      res.header('Access-Control-Allow-Credentials', 'true');
+      next();
+    });
 
-        // Check against allowed origins
-        for (const allowedOrigin of allowedOrigins) {
-          if (typeof allowedOrigin === 'string') {
-            if (origin === allowedOrigin || origin.startsWith(allowedOrigin.replace(/\/$/, ''))) {
+    // Also use cors middleware as backup
+    this.app.use(cors({
+      origin: function (origin, callback) {
+        // Allow requests with no origin
+        if (!origin) return callback(null, true);
+        
+        // Check if origin is allowed
+        for (const allowed of allowedOrigins) {
+          if (typeof allowed === 'string') {
+            if (origin === allowed || origin.startsWith(allowed.replace(/\/$/, ''))) {
               return callback(null, true);
             }
-          } else if (allowedOrigin instanceof RegExp) {
-            if (allowedOrigin.test(origin)) {
+          } else if (allowed instanceof RegExp) {
+            if (allowed.test(origin)) {
               return callback(null, true);
             }
           }
         }
-
-        console.warn(`🚫 CORS blocked: ${origin}`);
+        
+        console.log(`CORS blocked: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       },
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cookie'],
-      exposedHeaders: ['Set-Cookie'],
-      optionsSuccessStatus: 200
-    };
-
-    // CRITICAL: Apply CORS BEFORE any routes
-    this.app.use(cors(corsOptions));
+      credentials: true
+    }));
 
     // Body parsers
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
+    
+    // Debug middleware
+    this.app.use((req, res, next) => {
+      console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+      console.log('Origin:', req.headers.origin);
+      console.log('User-Agent:', req.headers['user-agent']);
+      next();
+    });
   }
 
   private initializeRoutes(): void {
-    // Test endpoint for CORS
-    this.app.get('/cors-test', (req, res) => {
+    // CORS test endpoint
+    this.app.get('/api/cors-test', (req, res) => {
       res.json({
-        message: 'CORS test successful!',
-        origin: req.headers.origin || 'none',
-        headers: req.headers,
+        success: true,
+        message: 'CORS is working!',
+        yourOrigin: req.headers.origin || 'none',
+        timestamp: new Date().toISOString(),
+        allowedOrigins: [
+          'https://slack-iexh.vercel.app',
+          'https://slack-uavy.vercel.app',
+          'https://slack-ebon.vercel.app',
+          'All Vercel preview deployments'
+        ]
+      });
+    });
+
+    // Simple test endpoint
+    this.app.get('/api/test', (req, res) => {
+      res.json({
+        message: 'API is working!',
+        method: req.method,
+        origin: req.headers.origin,
         timestamp: new Date().toISOString()
       });
     });
@@ -92,9 +177,8 @@ class App {
       res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        cors: 'enabled',
         origin: req.headers.origin || 'none',
-        note: 'If origin is none, this was a direct request'
+        environment: process.env.NODE_ENV || 'development'
       });
     });
 
@@ -104,21 +188,19 @@ class App {
     this.app.use('/api/messages', messageRoutes);
     this.app.use('/api/socket', debugRoutes);
 
-    // Dev debug routes
-    if (process.env.NODE_ENV !== 'production') {
-      this.app.use('/api/debug', debugRoutes);
-    }
-
     // Error handling
     this.app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      console.error('Server Error:', err);
+      console.error('Error:', err);
       
+      // CORS error handling
       if (err.message.includes('CORS')) {
+        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        res.header('Access-Control-Allow-Credentials', 'true');
         return res.status(403).json({
           error: 'CORS Error',
           message: err.message,
           yourOrigin: req.headers.origin,
-          tip: 'Make sure your frontend URL matches the allowed patterns'
+          tip: 'Contact admin to add your origin to allowed list'
         });
       }
       
@@ -127,7 +209,11 @@ class App {
 
     // 404 handler
     this.app.use('*', (req, res) => {
-      res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+      res.status(404).json({ 
+        error: 'Not Found', 
+        path: req.originalUrl,
+        method: req.method 
+      });
     });
   }
 
@@ -145,11 +231,6 @@ class App {
 
       this.httpServer.listen(this.port, () => {
         console.log(`🚀 Server running on port ${this.port}`);
-        console.log(`🌐 CORS enabled for:`);
-        console.log(`   - https://slack-iexh.vercel.app`);
-        console.log(`   - https://slack-uavy.vercel.app`);
-        console.log(`   - All Vercel preview deployments`);
-        console.log(`   - Localhost:5173 and :3000`);
       });
     } catch (error) {
       console.error('Failed to start server:', error);
