@@ -26,10 +26,27 @@ class App {
   }
 
   private initializeMiddlewares(): void {
-    this.app.use(cors({
-      origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    // Support multiple allowed origins via `CLIENT_URLS` (comma-separated) or single `CLIENT_URL`.
+    const clientUrls = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'https://slack-uavy.vercel.app')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const corsOptions = {
+      origin: (origin: any, callback: any) => {
+        // allow requests with no origin (like curl, server-to-server)
+        if (!origin) return callback(null, true);
+        if (clientUrls.length === 0 || clientUrls.includes(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+      },
       credentials: true,
-    }));
+    };
+
+    this.app.use(cors(corsOptions));
+    // Ensure preflight requests are handled for all routes
+    this.app.options('*', cors(corsOptions));
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
   }
