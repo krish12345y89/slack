@@ -22,9 +22,6 @@ export default defineConfig({
       },
     },
   },
-  // ✅ ADD THIS BASE CONFIGURATION
-  base: './', // or '/'
-  
   build: {
     rollupOptions: {
       output: {
@@ -37,13 +34,5 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 1000,
-    // ✅ ADD THESE FOR BETTER BUILD
-    outDir: 'dist',
-    emptyOutDir: true,
-    sourcemap: process.env.NODE_ENV !== 'production',
   },
-  // ✅ ADD PREVIEW CONFIG
-  preview: {
-    port: 5173,
-  }
 })
