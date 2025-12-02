@@ -22,7 +22,7 @@ class Database {
 
   public async connect(): Promise<void> {
     try {
-      await mongoose.connect(this.connectionString);
+      await mongoose.connect("mongodb+srv://krisharora3406:KRISH%4012345y89@cluster0.gxs7ajw.mongodb.net/chat");
       console.log('✅ MongoDB connected successfully');
     } catch (error) {
       console.error('❌ MongoDB connection error:', error);
