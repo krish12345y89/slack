@@ -15,6 +15,7 @@ class App {
   public app: express.Application;
   private httpServer: ReturnType<typeof createServer>;
   private port: number;
+  private dbConnected: boolean = false;
 
   constructor() {
     this.app = express();
@@ -26,6 +27,25 @@ class App {
   }
 
   private initializeMiddlewares(): void {
+    // For Vercel serverless: connect DB on first request (MUST be first middleware)
+    this.app.use(async (req, res, next) => {
+      if (!this.dbConnected) {
+        try {
+          const database = Database.getInstance();
+          await database.connect();
+          this.dbConnected = true;
+          console.log('✅ Database connected on first request');
+        } catch (error) {
+          console.error('❌ Failed to connect database:', error);
+          return res.status(503).json({ 
+            error: 'Service unavailable',
+            message: 'Database connection failed'
+          });
+        }
+      }
+      next();
+    });
+
     // VERCEL-SPECIFIC CORS FIX
     // For Vercel serverless functions, we need to handle CORS differently
     
