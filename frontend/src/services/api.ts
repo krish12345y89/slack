@@ -44,7 +44,7 @@ class ApiService {
 
     // Response interceptor
     this.api.interceptors.response.use(
-      (response: AxiosResponse) => response.data,
+      (response: AxiosResponse) => response.data as any,
       (error) => {
         const message = error.response?.data?.message || 'An error occurred';
         
@@ -112,20 +112,25 @@ class ApiService {
   };
 
   // Generic methods
-  public get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.api.get(url, config);
+  // Generic methods: await axios and cast the unwrapped response data to T
+  public async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    const res = await this.api.get(url, config as any);
+    return res as unknown as T;
   }
 
-  public post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.api.post(url, data, config);
+  public async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    const res = await this.api.post(url, data, config as any);
+    return res as unknown as T;
   }
 
-  public put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.api.put(url, data, config);
+  public async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    const res = await this.api.put(url, data, config as any);
+    return res as unknown as T;
   }
 
-  public delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.api.delete(url, config);
+  public async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    const res = await this.api.delete(url, config as any);
+    return res as unknown as T;
   }
 }
 

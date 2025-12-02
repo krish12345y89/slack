@@ -38,7 +38,7 @@ const ChatPage: React.FC = () => {
     (channel: any) =>
       channel.name.toLowerCase().includes(search.toLowerCase()) ||
       channel.description?.toLowerCase().includes(search.toLowerCase())
-  );
+  ) || [];
 
   if (isLoading) {
     return (

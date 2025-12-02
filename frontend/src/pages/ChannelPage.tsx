@@ -71,16 +71,17 @@ const ChannelPage: React.FC = () => {
 
   // Dev-time debug: always declare this effect (to avoid hook order changes).
   useEffect(() => {
-    if (channelId && !(channelData?.data ?? channelData)) {
-      // eslint-disable-next-line no-console
-      console.error('ChannelPage debug: missing channel payload', { channelId, channelData, messagesData });
-      try {
-        errorToast(`Channel ${channelId} not found — check console/network`);
-      } catch (err) {
-        // ignore
-      }
+    if (channelId) {
+      console.log('[ChannelPage]', {
+        channelId,
+        channelDataDefined: !!channelData,
+        channelData,
+        isLoadingChannel,
+        messagesDataDefined: !!messagesData,
+        isLoadingMessages,
+      });
     }
-  }, [channelId, channelData, messagesData]);
+  }, [channelId, channelData, messagesData, isLoadingChannel, isLoadingMessages]);
 
   if (isLoadingChannel || isLoadingMessages) {
     return (
@@ -90,10 +91,10 @@ const ChannelPage: React.FC = () => {
     );
   }
 
-  // Normalize API response shapes: some endpoints return `{ data: ... }`,
-  // others return the payload directly (because ApiService interceptor returns response.data).
-  const channelPayload = channelData?.data ?? channelData;
-  if (!channelId || !channelPayload) {
+  // Normalize API response shapes: API returns response.data via interceptor
+  // getChannelById returns { channel }, others may return channel directly
+  const channel = channelData?.data?.channel || channelData?.data || channelData;
+  if (!channelId || !channel) {
     return (
       <div className="flex items-center justify-center h-full p-4">
         <ErrorAlert title="Channel not found" message="The channel you're looking for doesn't exist" />
@@ -101,9 +102,8 @@ const ChannelPage: React.FC = () => {
     );
   }
 
-  const channel = channelPayload.channel ?? channelPayload;
-  const messagesPayload = messagesData?.data ?? messagesData;
-  const messages = messagesPayload?.data ?? messagesPayload ?? [];
+  const messagesPayload = messagesData?.data || messagesData;
+  const messages = messagesPayload?.data || messagesPayload || [];
 
   
 
