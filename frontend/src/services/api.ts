@@ -32,6 +32,10 @@ class ApiService {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
+          // Debug: log token being sent (remove in production)
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[API] Sending token:', token.substring(0, 20) + '...');
+          }
         }
         return config;
       },
@@ -45,10 +49,17 @@ class ApiService {
         const message = error.response?.data?.message || 'An error occurred';
         
         if (error.response?.status === 401) {
-          localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-          localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-          window.location.href = ROUTES.LOGIN;
-          showToast('Session expired. Please login again.', 'error');
+          // Debug log
+          console.error('[API] 401 Unauthorized:', error.response?.data);
+          
+          // Only clear storage if not a login/register request (they handle their own auth)
+          const url = error.config?.url || '';
+          if (!url.includes('/auth/login') && !url.includes('/auth/register')) {
+            localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+            localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+            window.location.href = ROUTES.LOGIN;
+            showToast('Session expired. Please login again.', 'error');
+          }
         } else if (error.response?.status === 403) {
           showToast('You do not have permission for this action', 'error');
         } else if (error.response?.status === 429) {
