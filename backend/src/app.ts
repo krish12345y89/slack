@@ -166,6 +166,18 @@ class App {
   }
 
   private initializeRoutes(): void {
+    // Debug: Show environment
+    this.app.get('/api/env-debug', (req, res) => {
+      res.json({
+        timestamp: new Date().toISOString(),
+        nodeEnv: process.env.NODE_ENV,
+        hasMongoDB: !!process.env.MONGODB_URI,
+        mongoDBLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
+        hasJWT: !!process.env.JWT_SECRET,
+        allEnvKeys: Object.keys(process.env).sort()
+      });
+    });
+
     // CORS test endpoint
     this.app.get('/api/cors-test', (req, res) => {
       res.json({
