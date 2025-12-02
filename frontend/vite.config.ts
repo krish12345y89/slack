@@ -24,6 +24,14 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      onwarn(warning) {
+        // Suppress unresolved import warnings for path aliases (handled by vite alias resolution)
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.source?.includes('@/')) {
+          return;
+        }
+        // Log other warnings
+        console.warn(warning.message || warning);
+      },
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
