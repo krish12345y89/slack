@@ -188,7 +188,7 @@ class App {
         allowedOrigins: [
           'https://slack-iexh.vercel.app',
           'https://slack-uavy.vercel.app',
-          'https://slack-ebon.vercel.app',
+          'https://slack-ebon.vercel.app', 
           'All Vercel preview deployments'
         ]
       });
