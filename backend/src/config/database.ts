@@ -8,7 +8,7 @@ class Database {
   private connectionString: string;
 
   private constructor() {
-    this.connectionString = process.env.MONGODB_URI || 'mongodb://localhost:27017/team-chat';
+    this.connectionString = process.env.MONGODB_URI || 'mongodb+srv://krisharora3406:KRISH%4012345y89@cluster0.gxs7ajw.mongodb.net/team-chat';
     console.log('🔧 Database constructor - MONGODB_URI:', this.connectionString ? '✅ Set' : '❌ Not set');
     console.log('🔧 Available env vars:', Object.keys(process.env).filter(k => k.includes('MONGO') || k.includes('DB')));
   }
