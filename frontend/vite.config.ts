@@ -26,7 +26,7 @@ export default defineConfig({
     rollupOptions: {
       onwarn(warning) {
         // Suppress unresolved import warnings for path aliases (handled by vite alias resolution)
-        if (warning.code === 'UNRESOLVED_IMPORT' && warning.source?.includes('@/')) {
+        if (warning.code === 'UNRESOLVED_IMPORT' && (warning as any).source?.includes('@/')) {
           return;
         }
         // Log other warnings
